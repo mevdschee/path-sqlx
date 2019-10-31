@@ -28,7 +28,7 @@ func (db *DB) Q(query string, arg interface{}) (interface{}, error) {
 	return nil, nil
 }
 
-// Create a sqlx connection
+// Create a pathsqlx connection
 func Create(user, password, dbname, driver, host, port string) (*DB, error) {
 	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable", host, port, user, password, dbname)
 	db, err := sqlx.Connect(driver, dsn)
