@@ -7,22 +7,15 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-func main() {
-	// this Pings the database trying to connect, panics on error
-	// use sqlx.Open() for sql.Open() semantics
-	host := "127.0.0.1"
-	port := "5432"
-	user := "php-crud-api"
-	password := "php-crud-api"
-	dbname := "php-crud-api"
-	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable", host, port, user, password, dbname)
-	db, err := sqlx.Connect("postgres", dsn)
-	if err != nil {
-		log.Fatalln(err)
-	}
+// DB is a wrapper around sqlx.DB which keeps track of the driverName upon Open,
+// used mostly to automatically bind named queries using the right bindvars.
+type DB struct {
+	*sqlx.DB
+}
 
-	// Selects Mr. Smith from the database
-	rows, err := db.NamedQuery(`SELECT * FROM posts WHERE id=:id`, map[string]interface{}{"id": 1})
+// Q is the query that returns nested paths
+func (db *DB) Q(query string, arg interface{}) (interface{}, error) {
+	rows, err := db.NamedQuery(query, arg)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -33,4 +26,12 @@ func main() {
 		}
 		fmt.Printf("%#v\n", row)
 	}
+	return nil, nil
+}
+
+// Create a sqlx connection
+func Create(user, password, dbname, driver, host, port string) (*DB, error) {
+	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable", host, port, user, password, dbname)
+	db, err := sqlx.Connect(driver, dsn)
+	return &DB{db}, err
 }
