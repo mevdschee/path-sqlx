@@ -1,4 +1,4 @@
-module github.com/mevdschee/path-sqlx
+module github.com/mevdschee/pathsqlx
 
 go 1.13
 

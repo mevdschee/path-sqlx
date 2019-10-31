@@ -1,11 +1,10 @@
-package main
+package pathsqlx
 
 import (
 	"fmt"
 	"log"
 
 	"github.com/jmoiron/sqlx"
-	_ "github.com/lib/pq"
 )
 
 func main() {
