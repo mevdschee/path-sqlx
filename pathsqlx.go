@@ -7,8 +7,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-// DB is a wrapper around sqlx.DB which keeps track of the driverName upon Open,
-// used mostly to automatically bind named queries using the right bindvars.
+// DB is a wrapper around sqlx.DB
 type DB struct {
 	*sqlx.DB
 }
