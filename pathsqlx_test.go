@@ -1,6 +1,7 @@
 package pathsqlx
 
 import (
+	"encoding/json"
 	"log"
 	"reflect"
 	"testing"
@@ -27,7 +28,7 @@ func TestDB_Q(t *testing.T) {
 		name    string
 		db      *DB
 		args    args
-		want    interface{}
+		want    string
 		wantErr bool
 	}{
 		{
@@ -37,7 +38,7 @@ func TestDB_Q(t *testing.T) {
 				"SELECT * from posts where id=:id",
 				map[string]interface{}{"id": 1},
 			},
-			nil,
+			`[[1,1,1,"blog started"]]`,
 			false,
 		},
 	}
@@ -48,8 +49,12 @@ func TestDB_Q(t *testing.T) {
 				t.Errorf("DB.Q() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("DB.Q() = %v, want %v", got, tt.want)
+			json, err := json.Marshal(got)
+			if err != nil {
+				log.Fatal("Cannot encode to JSON ", err)
+			}
+			if !reflect.DeepEqual(string(json), tt.want) {
+				t.Errorf("DB.Q() = %s, want %s", json, tt.want)
 			}
 		})
 	}

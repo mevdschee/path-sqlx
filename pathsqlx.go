@@ -18,14 +18,15 @@ func (db *DB) Q(query string, arg interface{}) (interface{}, error) {
 	if err != nil {
 		log.Fatalln(err)
 	}
+	results := []interface{}{}
 	for rows.Next() {
 		row, err := rows.SliceScan()
 		if err != nil {
 			log.Fatalln(err)
 		}
-		fmt.Printf("%#v\n", row)
+		results = append(results, row)
 	}
-	return nil, nil
+	return results, nil
 }
 
 // Create a pathsqlx connection
