@@ -22,7 +22,7 @@ func init() {
 func TestDB_Q(t *testing.T) {
 	type args struct {
 		query string
-		arg   interface{}
+		arg   string
 	}
 	tests := []struct {
 		name    string
@@ -36,7 +36,7 @@ func TestDB_Q(t *testing.T) {
 			db,
 			args{
 				"SELECT * from posts where id=:id",
-				map[string]interface{}{"id": 1},
+				`{"id": 1}`,
 			},
 			`[[1,1,1,"blog started"]]`,
 			false,
@@ -44,7 +44,12 @@ func TestDB_Q(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.db.Q(tt.args.query, tt.args.arg)
+			var args map[string]interface{}
+			err := json.Unmarshal([]byte(tt.args.arg), &args)
+			if err != nil {
+				log.Fatal("Cannot decode to JSON ", err)
+			}
+			got, err := tt.db.Q(tt.args.query, args)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DB.Q() error = %v, wantErr %v", err, tt.wantErr)
 				return
