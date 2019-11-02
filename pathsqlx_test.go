@@ -90,7 +90,7 @@ func TestDB_Q(t *testing.T) {
 			if err != nil {
 				log.Fatal("Cannot decode to JSON ", err)
 			}
-			got, err := tt.db.Q(tt.args.query, args)
+			got, err := tt.db.PathQuery(tt.args.query, args)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DB.Q() error = %v, wantErr %v", err, tt.wantErr)
 				return

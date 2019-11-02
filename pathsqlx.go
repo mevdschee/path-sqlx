@@ -191,8 +191,8 @@ func (db *DB) removeHashes(tree *orderedmap.OrderedMap, path string) (interface{
 	return mapResults, nil
 }
 
-// Q is the query that returns nested paths
-func (db *DB) Q(query string, arg interface{}) (interface{}, error) {
+// PathQuery is the query that returns nested paths
+func (db *DB) PathQuery(query string, arg interface{}) (interface{}, error) {
 	rows, err := db.NamedQuery(query, arg)
 	if err != nil {
 		return nil, err
