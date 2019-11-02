@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/iancoleman/orderedmap"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -40,48 +41,52 @@ func (db *DB) getPaths(columns []string) ([]string, error) {
 	return paths, nil
 }
 
-func (db *DB) getAllRecords(rows *sqlx.Rows, paths []string) ([]map[string]interface{}, error) {
-	records := []map[string]interface{}{}
+func (db *DB) getAllRecords(rows *sqlx.Rows, paths []string) ([]*orderedmap.OrderedMap, error) {
+	records := []*orderedmap.OrderedMap{}
 	for rows.Next() {
 		row, err := rows.SliceScan()
 		if err != nil {
 			return records, err
 		}
-		record := map[string]interface{}{}
+		record := orderedmap.New()
 		for i, value := range row {
-			record[paths[i][1:]] = value
+			record.Set(paths[i][1:], value)
 		}
 		records = append(records, record)
 	}
 	return records, nil
 }
 
-func (db *DB) groupBySeparator(records []map[string]interface{}, separator string) ([]map[string]interface{}, error) {
-	results := []map[string]interface{}{}
+func (db *DB) groupBySeparator(records []*orderedmap.OrderedMap, separator string) ([]*orderedmap.OrderedMap, error) {
+	results := []*orderedmap.OrderedMap{}
 	for _, record := range records {
-		result := map[string]interface{}{}
-		for name, value := range record {
+		result := orderedmap.New()
+		for _, name := range record.Keys() {
+			value, _ := record.Get(name)
 			parts := strings.Split(name, separator)
 			newName := parts[len(parts)-1]
 			path := strings.Join(parts[:len(parts)-1], separator)
 			if len(parts) > 0 {
 				path += separator
 			}
-			if _, found := result[path]; !found {
-				result[path] = map[string]interface{}{}
+			if _, found := result.Get(path); !found {
+				result.Set(path, orderedmap.New())
 			}
-			result[path].(map[string]interface{})[newName] = value
+			subResult, _ := result.Get(path)
+			subResultMap, _ := subResult.(*orderedmap.OrderedMap)
+			subResultMap.Set(newName, value)
 		}
 		results = append(results, result)
 	}
 	return results, nil
 }
 
-func (db *DB) addHashes(records []map[string]interface{}) ([]map[string]interface{}, error) {
-	results := []map[string]interface{}{}
+func (db *DB) addHashes(records []*orderedmap.OrderedMap) ([]*orderedmap.OrderedMap, error) {
+	results := []*orderedmap.OrderedMap{}
 	for _, record := range records {
 		mapping := map[string]string{}
-		for key, part := range record {
+		for _, key := range record.Keys() {
+			part, _ := record.Get(key)
 			if key[len(key)-2:] != "[]" {
 				continue
 			}
@@ -98,16 +103,92 @@ func (db *DB) addHashes(records []map[string]interface{}) ([]map[string]interfac
 			mappingKeys = append(mappingKeys, key)
 		}
 		sort.Sort(ByRevLen(mappingKeys))
-		result := map[string]interface{}{}
-		for key, value := range record {
+		result := orderedmap.New()
+		for _, key := range record.Keys() {
+			value, _ := record.Get(key)
 			for _, search := range mappingKeys {
 				key = strings.Replace(key, search, mapping[search], -1)
 			}
-			result[key] = value
+			result.Set(key, value)
 		}
 		results = append(results, result)
 	}
 	return results, nil
+}
+
+func (db *DB) combineIntoTree(records []*orderedmap.OrderedMap, separator string) (*orderedmap.OrderedMap, error) {
+	results := orderedmap.New()
+	for _, record := range records {
+		for _, name := range record.Keys() {
+			value, _ := record.Get(name)
+			valueMap, _ := value.(*orderedmap.OrderedMap)
+			for _, key := range valueMap.Keys() {
+				v, _ := valueMap.Get(key)
+				path := strings.Split(name+key, separator)
+				newName := path[len(path)-1]
+				current := results
+				for _, p := range path[:len(path)-1] {
+					if _, found := current.Get(p); !found {
+						current.Set(p, orderedmap.New())
+					}
+					next, _ := current.Get(p)
+					nextMap, _ := next.(*orderedmap.OrderedMap)
+					current = nextMap
+				}
+				current.Set(newName, v)
+			}
+		}
+	}
+	next, _ := results.Get("")
+	nextMap, _ := next.(*orderedmap.OrderedMap)
+	return nextMap, nil
+}
+
+func (db *DB) removeHashes(tree *orderedmap.OrderedMap, path string) (interface{}, error) {
+	values := orderedmap.New()
+	trees := orderedmap.New()
+	results := []interface{}{}
+	for _, key := range tree.Keys() {
+		value, _ := tree.Get(key)
+		valueMap, success := value.(*orderedmap.OrderedMap)
+		if success {
+			if key[:1] == "!" && key[len(key)-1:] == "!" {
+				result, err := db.removeHashes(valueMap, path+"[]")
+				if err != nil {
+					return nil, err
+				}
+				results = append(results, result)
+			} else {
+				result, err := db.removeHashes(valueMap, path+"."+key)
+				if err != nil {
+					return nil, err
+				}
+				trees.Set(key, result)
+			}
+		} else {
+			values.Set(key, value)
+		}
+	}
+	if len(results) > 0 {
+		hidden := append(values.Keys(), trees.Keys()...)
+		if len(hidden) > 0 {
+			return nil, fmt.Errorf(
+				`The path "%s.%s" is hidden by the path "%s[]"`,
+				path, hidden[0], path,
+			)
+		}
+		return results, nil
+	}
+	mapResults := orderedmap.New()
+	for _, key := range values.Keys() {
+		value, _ := values.Get(key)
+		mapResults.Set(key, value)
+	}
+	for _, key := range trees.Keys() {
+		value, _ := trees.Get(key)
+		mapResults.Set(key, value)
+	}
+	return mapResults, nil
 }
 
 // Q is the query that returns nested paths
@@ -136,7 +217,15 @@ func (db *DB) Q(query string, arg interface{}) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	return hashes, nil
+	tree, err := db.combineIntoTree(hashes, ".")
+	if err != nil {
+		return nil, err
+	}
+	result, err := db.removeHashes(tree, "$")
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 // Create a pathsqlx connection

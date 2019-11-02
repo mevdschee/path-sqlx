@@ -33,7 +33,8 @@ func TestDB_Q(t *testing.T) {
 		want    string
 		wantErr bool
 	}{
-		{"first", db, args{"SELECT * from posts where id=:id", `{"id": 1}`}, `[[1,1,1,"blog started"]]`, false},
+		{"first", db, args{"SELECT * from posts where id=:id", `{"id": 1}`}, `[{"id":1,"user_id":1,"category_id":1,"content":"blog started"}]`, false},
+		{"second", db, args{"select id from posts where id<=:two and id>=:one order by id", `{"one": 1, "two": 2}`}, `[{"id":1},{"id":2}]`, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
