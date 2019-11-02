@@ -66,7 +66,7 @@ func (db *DB) groupBySeparator(records []*orderedmap.OrderedMap, separator strin
 			parts := strings.Split(name, separator)
 			newName := parts[len(parts)-1]
 			path := strings.Join(parts[:len(parts)-1], separator)
-			if len(parts) > 0 {
+			if len(parts)-1 > 0 {
 				path += separator
 			}
 			if _, found := result.Get(path); !found {
@@ -87,7 +87,7 @@ func (db *DB) addHashes(records []*orderedmap.OrderedMap) ([]*orderedmap.Ordered
 		mapping := map[string]string{}
 		for _, key := range record.Keys() {
 			part, _ := record.Get(key)
-			if key[len(key)-2:] != "[]" {
+			if len(key)-2 < 0 || key[len(key)-2:] != "[]" {
 				continue
 			}
 			bytes, err := json.Marshal(part)

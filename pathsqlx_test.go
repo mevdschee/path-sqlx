@@ -33,8 +33,55 @@ func TestDB_Q(t *testing.T) {
 		want    string
 		wantErr bool
 	}{
-		{"first", db, args{"SELECT * from posts where id=:id", `{"id": 1}`}, `[{"id":1,"user_id":1,"category_id":1,"content":"blog started"}]`, false},
-		{"second", db, args{"select id from posts where id<=:two and id>=:one order by id", `{"one": 1, "two": 2}`}, `[{"id":1},{"id":2}]`, false},
+		{
+			"single record no path", db,
+			args{"select id, content from posts where id=:id", `{"id": 1}`},
+			`[{"id":1,"content":"blog started"}]`, false,
+		}, {
+			"two records no path", db,
+			args{"select id from posts where id<=2 order by id", `{}`},
+			`[{"id":1},{"id":2}]`, false,
+		}, {
+			"two records named no path", db,
+			args{"select id from posts where id<=:two and id>=:one order by id", `{"one": 1, "two": 2}`},
+			`[{"id":1},{"id":2}]`, false,
+		}, {
+			"two tables with path", db,
+			args{`select posts.id as "$[].posts.id", comments.id as "$[].comments.id" from posts left join comments on post_id = posts.id where posts.id=1`, `{}`},
+			`[{"posts":{"id":1},"comments":{"id":1}},{"posts":{"id":1},"comments":{"id":2}}]`, false,
+		}, {
+			"posts with comments properly nested", db,
+			args{`select posts.id as "$.posts[].id", comments.id as "$.posts[].comments[].id" from posts left join comments on post_id = posts.id where posts.id<=2 order by posts.id, comments.id`, `{}`},
+			`{"posts":[{"id":1,"comments":[{"id":1},{"id":2}]},{"id":2,"comments":[{"id":3},{"id":4},{"id":5},{"id":6}]}]}`, false,
+		}, {
+			"comments with post properly nested", db,
+			args{`select posts.id as "$.comments[].post.id", comments.id as "$.comments[].id" from posts left join comments on post_id = posts.id where posts.id<=2 order by comments.id, posts.id`, `{}`},
+			`{"comments":[{"id":1,"post":{"id":1}},{"id":2,"post":{"id":1}},{"id":3,"post":{"id":2}},{"id":4,"post":{"id":2}},{"id":5,"post":{"id":2}},{"id":6,"post":{"id":2}}]}`, false,
+		}, {
+			"count posts with simple alias", db,
+			args{`select count(*) as "posts" from posts`, `{}`},
+			`[{"posts":12}]`, false,
+		}, {
+			"count posts with path", db,
+			args{`select count(*) as "$[].posts" from posts`, `{}`},
+			`[{"posts":12}]`, false,
+		}, {
+			"count posts as object with path", db,
+			args{`select count(*) as "$.posts" from posts`, `{}`},
+			`{"posts":12}`, false,
+		}, {
+			"count posts grouped no path", db,
+			args{`select categories.name, count(posts.id) as "post_count" from posts, categories where posts.category_id = categories.id group by categories.name order by categories.name`, `{}`},
+			`[{"name":"announcement","post_count":11},{"name":"article","post_count":1}]`, false,
+		}, {
+			"count posts with added root set in path", db,
+			args{`select count(*) as "$.statistics.posts" from posts`, `{}`},
+			`{"statistics":{"posts":12}}`, false,
+		}, {
+			"count posts and comments as object with path", db,
+			args{`select (select count(*) from posts) as "$.stats.posts", (select count(*) from comments) as "comments"`, `{}`},
+			`{"stats":{"posts":12,"comments":6}}`, false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
