@@ -1,11 +1,14 @@
 package pathsqlx
 
 import (
-	"fmt"
-	"strings"
 	"crypto/md5"
-    "encoding/hex"
-    
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"json"
+	"sort"
+	"strings"
+
 	"github.com/jmoiron/sqlx"
 )
 
@@ -14,8 +17,9 @@ type DB struct {
 	*sqlx.DB
 }
 
-// Implement length-based sort with ByLen type.
+// ByRevLen is for reverse length-based sort.
 type ByRevLen []string
+
 func (a ByRevLen) Len() int           { return len(a) }
 func (a ByRevLen) Less(i, j int) bool { return len(a[i]) > len(a[j]) }
 func (a ByRevLen) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
@@ -78,27 +82,33 @@ func (db *DB) addHashes(records []map[string]interface{}) ([]map[string]interfac
 	results := []map[string]interface{}{}
 	for _, record := range records {
 		mapping := map[string]string{}
-		for name, value := range record {
+		for key, part := range record {
 			if key[len(key)-2:] != "[]" {
 				continue
 			}
-			hash = hex.EncodeToString(md5.Sum(json.Marshal(part)))
+			bytes, err := json.Marshal(part)
+			if err != nil {
+				return nil, err
+			}
+			md5 := md5.Sum(bytes)
+			hash := hex.EncodeToString(md5[:])
 			mapping[key] = key[:len(key)-2] + ".!" + hash + "!"
-		newKeys = []string{}
-		// rev sort keys by len
+		}
 		mappingKeys := []string{}
-		for key, _ := range mapping {
+		for key := range mapping {
 			mappingKeys = append(mappingKeys, key)
 		}
-		for key, _ := range record {
-			for search in sorted(mapping.keys(), key=len, reverse=True):
-				key = strings.Replace(key, search, mapping[search])
+		sort.Sort(ByRevLen(mappingKeys))
+		result := map[string]interface{}{}
+		for key, value := range record {
+			for _, search := range mappingKeys {
+				key = strings.Replace(key, search, mapping[search], -1)
 			}
-			newKeys = append(newKeys, key)
+			result[key] = value
 		}
-		results.append(OrderedDict(zip(newKeys, record.values())))
+		results = append(results, result)
 	}
-	return results
+	return results, nil
 }
 
 // Q is the query that returns nested paths
@@ -123,7 +133,7 @@ func (db *DB) Q(query string, arg interface{}) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	paths, err := db.addHashes(groups)
+	hashes, err := db.addHashes(groups)
 	if err != nil {
 		return nil, err
 	}
