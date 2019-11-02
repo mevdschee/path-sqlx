@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"testing"
 
+	"gopkg.in/gcfg.v1"
+
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/lib/pq"
 	_ "github.com/mattn/go-sqlite3"
@@ -13,9 +15,24 @@ import (
 
 var db *DB
 
+var cfg = struct {
+	Test struct {
+		Username string
+		Password string
+		Database string
+		Driver   string
+		Address  string
+		Port     string
+	}
+}{}
+
 func init() {
 	var err error
-	db, err = Create("php-crud-api", "php-crud-api", "php-crud-api", "postgres", "127.0.0.1", "5432")
+	err = gcfg.ReadFileInto(&cfg, "test_config.ini")
+	if err != nil {
+		log.Fatalf("Failed to parse gcfg data: %s", err)
+	}
+	db, err = Create(cfg.Test.Username, cfg.Test.Password, cfg.Test.Database, cfg.Test.Driver, cfg.Test.Address, cfg.Test.Port)
 	if err != nil {
 		log.Fatalln(err)
 	}

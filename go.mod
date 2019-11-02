@@ -8,4 +8,6 @@ require (
 	github.com/jmoiron/sqlx v1.2.0
 	github.com/lib/pq v1.2.0
 	github.com/mattn/go-sqlite3 v1.9.0
+	gopkg.in/gcfg.v1 v1.2.3
+	gopkg.in/warnings.v0 v0.1.2 // indirect
 )
