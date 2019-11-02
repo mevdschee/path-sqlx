@@ -3,7 +3,9 @@ package pathsqlx
 import (
 	"fmt"
 	"strings"
-
+	"crypto/md5"
+    "encoding/hex"
+    
 	"github.com/jmoiron/sqlx"
 )
 
@@ -11,6 +13,12 @@ import (
 type DB struct {
 	*sqlx.DB
 }
+
+// Implement length-based sort with ByLen type.
+type ByRevLen []string
+func (a ByRevLen) Len() int           { return len(a) }
+func (a ByRevLen) Less(i, j int) bool { return len(a[i]) > len(a[j]) }
+func (a ByRevLen) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 
 func (db *DB) getPaths(columns []string) ([]string, error) {
 	paths := []string{}
@@ -69,18 +77,24 @@ func (db *DB) groupBySeparator(records []map[string]interface{}, separator strin
 func (db *DB) addHashes(records []map[string]interface{}) ([]map[string]interface{}, error) {
 	results := []map[string]interface{}{}
 	for _, record := range records {
-		mapping = OrderedDict()
-		for key, part in record.items():
-			if key[-2:] != "[]":
+		mapping := map[string]string{}
+		for name, value := range record {
+			if key[len(key)-2:] != "[]" {
 				continue
-			encoder = JSONEncoder(ensure_ascii=False, separators=(",", ":"))
-			hash = md5(encoder.encode(part).encode("utf-8")).hexdigest()
-			mapping[key] = key[:-2] + ".!" + hash + "!"
-		newKeys = []
-		for key in record.keys():
+			}
+			hash = hex.EncodeToString(md5.Sum(json.Marshal(part)))
+			mapping[key] = key[:len(key)-2] + ".!" + hash + "!"
+		newKeys = []string{}
+		mappingKeys := []string{}
+		for key, _ := range codes {
+			mappingKeys = append(mappingKeys, key)
+		}
+		for key, _ := range record {
 			for search in sorted(mapping.keys(), key=len, reverse=True):
-				key = key.replace(search, mapping[search])
-			newKeys.append(key)
+				key = strings.Replace(key, search, mapping[search])
+			}
+			newKeys = append(newKeys, key)
+		}
 		results.append(OrderedDict(zip(newKeys, record.values())))
 	}
 	return results
