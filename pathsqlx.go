@@ -85,8 +85,9 @@ func (db *DB) addHashes(records []map[string]interface{}) ([]map[string]interfac
 			hash = hex.EncodeToString(md5.Sum(json.Marshal(part)))
 			mapping[key] = key[:len(key)-2] + ".!" + hash + "!"
 		newKeys = []string{}
+		// rev sort keys by len
 		mappingKeys := []string{}
-		for key, _ := range codes {
+		for key, _ := range mapping {
 			mappingKeys = append(mappingKeys, key)
 		}
 		for key, _ := range record {
