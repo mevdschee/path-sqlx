@@ -136,7 +136,7 @@ func (db *DB) Q(query string, arg interface{}) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	return paths, nil
+	return hashes, nil
 }
 
 // Create a pathsqlx connection
