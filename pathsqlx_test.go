@@ -38,7 +38,7 @@ func init() {
 	}
 }
 
-func TestDB_Q(t *testing.T) {
+func TestPathQuery(t *testing.T) {
 	type args struct {
 		query string
 		arg   string
